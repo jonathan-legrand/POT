@@ -249,6 +249,16 @@ def gmm_ot_plan(m_s, m_t, C_s, C_t, w_s, w_t, log=False):
     return emd(w_s, w_t, D, log=log)
 
 
+def logsumexp(x, scaling_factor=None):
+    """
+    logsumexp trick such as in https://gregorygundersen.com/blog/2020/02/09/log-sum-exp/
+    """
+    nx = get_backend(x, scaling_factor)
+    shift = nx.max(x)
+    y = shift + nx.log(nx.sum(scaling_factor * nx.exp(x - shift)))
+    return y
+
+
 def gmm_ot_apply_map(
     x, m_s, m_t, C_s, C_t, w_s, w_t, plan=None, method="bary", seed=None
 ):
@@ -354,10 +364,10 @@ def gmm_ot_apply_map(
 
         for i_sample in range(n_samples):
             log_g = logpdf[i_sample]
-            log_diff = log_g[:, None] - log_g[None, :]
-            weighted_exp = w_s[:, None] * nx.exp(log_diff)
-            denom = nx.sum(weighted_exp, axis=0)[:, None] * nx.ones(plan.shape[1])
-            p_mat = plan / denom
+            log_denom = logsumexp(log_g, scaling_factor=w_s)
+            p_mat = plan * nx.exp(
+                log_g.reshape((k_s, 1)) - log_denom
+            )  # shape (k_s, k_t): p_mat[i,j] = plan[i,j]*g_i(x)/D(x)
 
             p = p_mat.reshape(k_s * k_t)  # stack line-by-line
             # sample between 0 and k_s * k_t - 1
