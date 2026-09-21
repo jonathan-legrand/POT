@@ -251,9 +251,28 @@ def gmm_ot_plan(m_s, m_t, C_s, C_t, w_s, w_t, log=False):
 
 def logsumexp(x, scaling_factor=None):
     """
-    logsumexp trick such as in https://gregorygundersen.com/blog/2020/02/09/log-sum-exp/
+    Computes log(sum(scaling_factor * exp(x))) stably using the log-sum-exp trick
+    with optional per-element weight.
+
+    Parameters
+    ----------
+    x : array-like
+        Log-values to sum.
+    scaling_factor : array-like, optional
+        Weights for each term. If None, defaults to 1
+
+    Returns
+    -------
+    float
+        log(sum(scaling_factor * exp(x))), computed stably.
+
+    References
+    ----------
+    Gundersen, G. (2020). The Log-Sum-Exp trick. Blog Post. Retrieved from https://gregorygundersen.com/blog/2020/02/09/log-sum-exp/
     """
     nx = get_backend(x, scaling_factor)
+    if scaling_factor is None:
+        scaling_factor = 1
     shift = nx.max(x)
     y = shift + nx.log(nx.sum(scaling_factor * nx.exp(x - shift)))
     return y
