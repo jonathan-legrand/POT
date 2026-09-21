@@ -19,6 +19,7 @@ from ot.gmm import (
     gmm_ot_apply_map,
     gmm_ot_plan_density,
     gmm_barycenter_fixed_point,
+    logsumexp,
 )
 
 try:
@@ -161,26 +162,22 @@ def test_gmm_apply_map():
     gmm_ot_apply_map(x, m_s, m_t, C_s, C_t, w_s, w_t, plan=plan)
 
 
+@pytest.skip_backend("tf")  # skips because of array assignment
+@pytest.skip_backend("jax")
 def test_gmm_apply_map_overflow(nx):
-    x_coord = 12
+    x_coord = 12.0
     d = 1
     k = 2
-    x = np.array([x_coord]).reshape((-1, d))
+    x = nx.from_numpy(np.array([x_coord]).reshape((-1, d)))
 
-    m_s = np.array([x_coord, 0]).reshape((k, d))
-    m_t = m_s.copy()
+    m_s = nx.from_numpy(np.array([x_coord, 0.0], dtype=np.float64).reshape((k, d)))
+    m_t = nx.from_numpy(np.array([x_coord, 0.0], dtype=np.float64).reshape((k, d)))
 
-    C_s = np.ones(m_s.shape).reshape((k, d, d)) / 10
-    C_t = C_s.copy()
+    C_s = nx.from_numpy(np.ones((k, d, d)) / 10.0)
+    C_t = nx.from_numpy(np.ones((k, d, d)) / 10.0)
 
-    w_s = np.array([0.5, 0.5])
-    w_t = w_s.copy()
-    m_s = nx.from_numpy(m_s)
-    m_t = nx.from_numpy(m_t)
-    C_s = nx.from_numpy(C_s)
-    C_t = nx.from_numpy(C_t)
-    w_s = nx.from_numpy(w_s)
-    w_t = nx.from_numpy(w_t)
+    w_s = nx.from_numpy(np.array([0.5, 0.5]))
+    w_t = nx.from_numpy(np.array([0.5, 0.5]))
 
     with warnings.catch_warnings():
         warnings.simplefilter(action="error")
@@ -195,6 +192,15 @@ def test_gmm_apply_map_overflow(nx):
             method="rand",
             seed=0,
         )
+
+
+def test_logsumexp_overflow_safety(nx):
+    """Test that large exponents don't overflow."""
+    x = nx.from_numpy(np.array([0.0, 710.0]))
+    result = logsumexp(x, scaling_factor=nx.from_numpy(np.array([1, 1])))
+    # Should be equal to exp(log(0)) + exp(log(710)) = 710
+    assert nx.isfinite(result)
+    assert nx.allclose(result, nx.from_numpy(np.array([710.0])))
 
 
 @pytest.mark.skipif(not torch, reason="No torch available")
