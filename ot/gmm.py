@@ -249,32 +249,33 @@ def gmm_ot_plan(m_s, m_t, C_s, C_t, w_s, w_t, log=False):
     return emd(w_s, w_t, D, log=log)
 
 
-def logsumexp(x, scaling_factor=None):
+def logsumexp(a, scaling_factor):
     """
     Computes log(sum(scaling_factor * exp(x))) stably using the log-sum-exp trick
-    with optional per-element weight.
+    with per-element weight. The backend nx.logsumexp does not allow passing
+    scaling weights.
 
     Parameters
     ----------
-    x : array-like
+    a : array-like
         Log-values to sum.
-    scaling_factor : array-like, optional
-        Weights for each term. If None, defaults to 1
+    scaling_factor : array-like
+        Weights for each term, must be of the same shape as a.
 
     Returns
     -------
     float
-        log(sum(scaling_factor * exp(x))), computed stably.
+        log(sum(scaling_factor * exp(a))), computed stably.
 
     References
     ----------
     Gundersen, G. (2020). The Log-Sum-Exp trick. Blog Post. Retrieved from https://gregorygundersen.com/blog/2020/02/09/log-sum-exp/
     """
-    nx = get_backend(x, scaling_factor)
+    nx = get_backend(a, scaling_factor)
     if scaling_factor is None:
         scaling_factor = 1
-    shift = nx.max(x)
-    y = shift + nx.log(nx.sum(scaling_factor * nx.exp(x - shift)))
+    shift = nx.max(a)
+    y = shift + nx.log(nx.sum(scaling_factor * nx.exp(a - shift)))
     return y
 
 
@@ -363,8 +364,8 @@ def gmm_ot_apply_map(
         # i and j, b[i, j] is the translation part
         rng = np.random.RandomState(seed)
 
-        A = nx.zeros((k_s, k_t, d, d))
-        b = nx.zeros((k_s, k_t, d))
+        A = nx.zeros((k_s, k_t, d, d), type_as=C_s)
+        b = nx.zeros((k_s, k_t, d), type_as=A)
 
         # only need to compute for non-zero plan entries
         for i, j in zip(*nx.where(plan > 0)):
