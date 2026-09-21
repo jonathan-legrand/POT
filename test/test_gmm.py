@@ -6,6 +6,7 @@
 #
 # License: MIT License
 
+import warnings
 import numpy as np
 import pytest
 from ot.utils import proj_simplex
@@ -158,6 +159,48 @@ def test_gmm_apply_map():
 
     plan = gmm_ot_plan(m_s, m_t, C_s, C_t, w_s, w_t)
     gmm_ot_apply_map(x, m_s, m_t, C_s, C_t, w_s, w_t, plan=plan)
+
+
+def test_gmm_apply_map_overflow(nx):
+    # In the original implementation
+    # log_diff computes log(g_i) - log(g_j) = log(g_i/g_j)
+    # so that g_k / sum_i(g_i) is easier to compute afterwards
+    # Problem is that if g_j(x) is small and g_i(x) is bigger,
+    # we can end up with high log ratios which overflows the
+    # subsequent exp calculation and throws a very unpleasant warning
+    x_coord = 12
+    d = 1
+    k = 2
+    x = np.array([x_coord]).reshape((-1, d))
+
+    m_s = np.array([x_coord, 0]).reshape((k, d))
+    m_t = m_s.copy()
+
+    C_s = np.ones(m_s.shape).reshape((k, d, d)) / 10
+    C_t = C_s.copy()
+
+    w_s = np.array([0.5, 0.5])
+    w_t = w_s.copy()
+    m_s = nx.from_numpy(m_s)
+    m_t = nx.from_numpy(m_t)
+    C_s = nx.from_numpy(C_s)
+    C_t = nx.from_numpy(C_t)
+    w_s = nx.from_numpy(w_s)
+    w_t = nx.from_numpy(w_t)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter(action="error")
+        gmm_ot_apply_map(
+            x,
+            m_s,
+            m_t,
+            C_s,
+            C_t,
+            w_s,
+            w_t,
+            method="rand",
+            seed=0,
+        )
 
 
 @pytest.mark.skipif(not torch, reason="No torch available")
