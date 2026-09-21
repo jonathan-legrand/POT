@@ -162,12 +162,6 @@ def test_gmm_apply_map():
 
 
 def test_gmm_apply_map_overflow(nx):
-    # In the original implementation
-    # log_diff computes log(g_i) - log(g_j) = log(g_i/g_j)
-    # so that g_k / sum_i(g_i) is easier to compute afterwards
-    # Problem is that if g_j(x) is small and g_i(x) is bigger,
-    # we can end up with high log ratios which overflows the
-    # subsequent exp calculation and throws a very unpleasant warning
     x_coord = 12
     d = 1
     k = 2
