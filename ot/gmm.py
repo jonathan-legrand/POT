@@ -249,7 +249,7 @@ def gmm_ot_plan(m_s, m_t, C_s, C_t, w_s, w_t, log=False):
     return emd(w_s, w_t, D, log=log)
 
 
-def logsumexp(a, scaling_factor):
+def logsumexp(a, scaling_factor, axis=None):
     """
     Computes log(sum(scaling_factor * exp(x))) stably using the log-sum-exp trick
     with per-element weight. The backend nx.logsumexp does not allow passing
@@ -275,7 +275,7 @@ def logsumexp(a, scaling_factor):
     if scaling_factor is None:
         scaling_factor = 1
     shift = nx.max(a)
-    y = shift + nx.log(nx.sum(scaling_factor * nx.exp(a - shift)))
+    y = shift + nx.log(nx.sum(scaling_factor * nx.exp(a - shift), axis=axis))
     return y
 
 
@@ -352,10 +352,14 @@ def gmm_ot_apply_map(
 
             # gaussian mapping between components i and j applied to x
             T_ij_x = x @ A + b
-            z = w_s[:, None, None] * nx.exp(logpdf - logpdf[i][None, :, :])
-            denom = nx.sum(z, axis=0)
 
-            out = out + plan[i, j] * T_ij_x / denom
+            log_g_i_x = logpdf[i]
+            # Could be optimized, that's not too smart to compute denom here at each iteration
+            denom = logsumexp(
+                logpdf.squeeze(), scaling_factor=w_s.reshape((-2, 1)), axis=0
+            )
+            p_ij_x = plan[i, j] * nx.exp(log_g_i_x - denom.reshape((-2, 1)))
+            out = out + p_ij_x * T_ij_x
 
         return out
 
